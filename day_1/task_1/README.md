@@ -19,8 +19,7 @@ This exercise helps in transforming complex technical papers into educationally 
 
 - [ChatGPT](https://chat.openai.com): For generating structured summaries using contextual prompting.
 - [arXiv Paper](https://arxiv.org/pdf/2108.01064.pdf): "Automated News Summarization Using Transformers" by Gupta et al.
-- Markdown (`README.md`): For documenting the process and output.
-- PDF Reader: To access and interpret the academic paper.
+
 
 ---
 
