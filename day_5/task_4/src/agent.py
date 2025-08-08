@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain.agents import initialize_agent, AgentType
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import Document
 from langchain.tools import BaseTool, tool
@@ -47,14 +47,8 @@ class EventReportAnalyzerAgent:
         self.summarizer = EventReportSummarizer(model_name=model_name, temperature=temperature)
         self.documents = None
         self.vector_store = None
-        self.agent_executor = None
+        self.agent = None
         self.tools = None
-
-    def initialize_agent(self):
-        """Initialize the agent with tools and executor."""
-        self.tools = self.setup_tools()
-        self.setup_agent()
-        return True
 
     def setup_tools(self) -> List[BaseTool]:
         """Setup the tools available to the agent."""
@@ -141,38 +135,20 @@ class EventReportAnalyzerAgent:
             get_vector_store_stats
         ]
 
-    def setup_agent(self):
-        """Setup the LangChain agent with tools and prompt."""
-        tools = self.setup_tools()
+    def initialize_agent(self):
+        """Initialize the agent with tools using initialize_agent."""
+        self.tools = self.setup_tools()
         
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an Event Report Analyzer Agent. Your job is to help analyze event reports 
-            and provide insights about outcomes, feedback, and specific details. 
-            
-            CRITICAL: You MUST use the available tools to analyze the event report content. 
-            When you use a tool, you MUST return the tool's result directly to the user.
-            Do NOT return tool call syntax or function names.
-            
-            Available tools:
-            - search_event_details: Search for specific information in the event report
-            - generate_summary: Generate an executive summary of the event report
-            - analyze_outcomes: Analyze key outcomes from the event report
-            - analyze_feedback: Analyze attendee feedback from the event report
-            - answer_specific_question: Answer specific questions about the event report
-            
-            IMPORTANT: When you use a tool, return the tool's result directly. Do not show function calls."""),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
-        
-        agent = create_openai_functions_agent(llm=self.llm, tools=tools, prompt=prompt)
-        self.agent_executor = AgentExecutor(
-            agent=agent, 
-            tools=tools, 
-            verbose=True, 
+        # Use initialize_agent instead of AgentExecutor
+        self.agent = initialize_agent(
+            tools=self.tools,
+            llm=self.llm,
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+            verbose=True,
             handle_parsing_errors=True,
-            return_intermediate_steps=False
+            max_iterations=5
         )
+        return True
 
     def process_pdf(self, pdf_path: str) -> bool:
         """
@@ -211,7 +187,7 @@ class EventReportAnalyzerAgent:
         Returns:
             Agent response
         """
-        if not self.agent_executor:
+        if not self.agent:
             return "Agent not initialized. Please process a PDF first."
         
         if not self.documents:
@@ -220,18 +196,18 @@ class EventReportAnalyzerAgent:
         try:
             # Create a more specific prompt that forces tool usage
             if "highlight" in query.lower() or "plenary" in query.lower():
-                enhanced_query = f"Search for information about '{query}' in the event report and provide a detailed analysis. Use the search_event_details tool to find relevant information, then provide a comprehensive response."
+                enhanced_query = f"Search for information about '{query}' in the event report and provide a detailed analysis."
             elif "summary" in query.lower():
-                enhanced_query = f"Generate an executive summary of the event report. Use the generate_summary tool."
+                enhanced_query = f"Generate an executive summary of the event report."
             elif "outcome" in query.lower():
-                enhanced_query = f"Analyze the key outcomes from the event report. Use the analyze_outcomes tool."
+                enhanced_query = f"Analyze the key outcomes from the event report."
             elif "feedback" in query.lower():
-                enhanced_query = f"Analyze the attendee feedback from the event report. Use the analyze_feedback tool."
+                enhanced_query = f"Analyze the attendee feedback from the event report."
             else:
-                enhanced_query = f"Answer this specific question about the event report: '{query}'. Use the answer_specific_question tool with the question: '{query}'"
+                enhanced_query = f"Answer this specific question about the event report: '{query}'"
             
-            result = self.agent_executor.invoke({"input": enhanced_query})
-            return result["output"]
+            result = self.agent.run(enhanced_query)
+            return result
         except Exception as e:
             return f"Error running agent: {str(e)}"
 

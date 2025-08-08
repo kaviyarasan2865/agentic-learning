@@ -165,12 +165,8 @@ def ask_question(question: str):
             st.info(f"🔍 Processing question: '{question}'")
             st.info(f"📄 Documents loaded: {len(st.session_state.agent.documents) if st.session_state.agent.documents else 0}")
             
-            # Use direct method for plenary highlights
-            if "plenary" in question.lower() and "highlight" in question.lower():
-                response = st.session_state.agent.search_plenary_highlights()
-            else:
-                # Use agent for other questions
-                response = st.session_state.agent.run_agent(question)
+            # Use agent for all questions
+            response = st.session_state.agent.run_agent(question)
             
             st.subheader("🤖 AI Response")
             st.markdown(response)

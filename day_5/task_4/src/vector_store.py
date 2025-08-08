@@ -2,7 +2,7 @@
 Vector Store Module
 
 Handles document storage and retrieval using DocArrayInMemorySearch.
-Provides semantic search capabilities for event report analysis without native builds.
+Provides semantic search capabilities for event report analysis.
 """
 
 import os
@@ -41,11 +41,38 @@ class VectorStoreManager:
         Returns:
             Configured vector store
         """
-        self.vector_store = DocArrayInMemorySearch.from_documents(
-            documents=documents,
-            embedding=self.embeddings
-        )
-        return self.vector_store
+        try:
+            # Ensure documents have proper metadata
+            processed_documents = []
+            for i, doc in enumerate(documents):
+                # Create a new document with proper metadata
+                processed_doc = Document(
+                    page_content=doc.page_content,
+                    metadata={
+                        "source": doc.metadata.get("source", "unknown"),
+                        "page": doc.metadata.get("page", i),
+                        "chunk_id": i
+                    }
+                )
+                processed_documents.append(processed_doc)
+            
+            # Create vector store with processed documents
+            self.vector_store = DocArrayInMemorySearch.from_documents(
+                documents=processed_documents,
+                embedding=self.embeddings
+            )
+            return self.vector_store
+            
+        except Exception as e:
+            print(f"Error creating vector store: {str(e)}")
+            # Fallback: create empty vector store and add documents one by one
+            self.vector_store = DocArrayInMemorySearch(embedding=self.embeddings)
+            for doc in documents:
+                try:
+                    self.vector_store.add_documents([doc])
+                except Exception as add_error:
+                    print(f"Error adding document: {str(add_error)}")
+            return self.vector_store
 
     def similarity_search(self, query: str, k: int = 5) -> List[Document]:
         """
@@ -60,8 +87,14 @@ class VectorStoreManager:
         """
         if not self.vector_store:
             raise Exception("Vector store not initialized.")
-        results = self.vector_store.similarity_search(query, k=k)
-        return results
+        
+        try:
+            results = self.vector_store.similarity_search(query, k=k)
+            return results
+        except Exception as e:
+            print(f"Error in similarity search: {str(e)}")
+            # Return empty list if search fails
+            return []
 
     def get_retriever(self, search_type: str = "similarity", k: int = 5) -> BaseRetriever:
         """
