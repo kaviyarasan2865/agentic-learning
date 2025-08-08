@@ -1,0 +1,12 @@
+langchain==0.1.0
+langchain-google-genai==0.0.6
+langchain-community==0.0.10
+google-generativeai==0.3.2
+pypdf==3.17.4
+python-dotenv==1.0.0
+markdown==3.5.2
+tiktoken==0.5.2
+docarray==0.40.0
+sentence-transformers==2.2.2
+torch==2.1.0
+streamlit==1.28.1
